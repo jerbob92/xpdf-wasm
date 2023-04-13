@@ -12,7 +12,6 @@ The compiled WebAssembly files are in the wasm folder and are embedded in the Go
 The instructions on how to compile the WebAssembly files can be found in the build folder.
 
 ## Usage
-## Getting started
 
 ### From binary
 
