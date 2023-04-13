@@ -30,7 +30,8 @@ jobs:
       - name: Build Windows
         if: matrix.os == 'windows-latest'
         run: |
-          CGO_ENABLED=0 go build -o artifacts/xpdf-wasm-windows-x64 main.go
+          $env:CGO_ENABLED = '0'
+          go build -o artifacts/xpdf-wasm-windows-x64 main.go
       - uses: actions/upload-artifact@v3
         with:
           name: builds
