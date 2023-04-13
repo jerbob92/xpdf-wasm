@@ -26,11 +26,11 @@ jobs:
       - name: Build MacOS
         if: matrix.os == 'macos-latest'
         run: |
-          go build -o artifacts/xpdf-wasm-mac-x64 main.go
+          CGO_ENABLED=0 go build -o artifacts/xpdf-wasm-mac-x64 main.go
       - name: Build Windows
         if: matrix.os == 'windows-latest'
         run: |
-          go build -o artifacts/xpdf-wasm-windows-x64 main.go
+          CGO_ENABLED=0 go build -o artifacts/xpdf-wasm-windows-x64 main.go
       - uses: actions/upload-artifact@v3
         with:
           name: builds

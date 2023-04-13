@@ -27,4 +27,4 @@ jobs:
           go-version: ${{ matrix.go }}
       - name: Test build
         run: |
-          go build main.go
+          CGO_ENABLED=0 go build main.go
