@@ -12,10 +12,11 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/jerbob92/xpdf-wasm/imports"
+
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/imports/emscripten"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
@@ -39,7 +40,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if _, err := emscripten.Instantiate(ctx, wazeroRuntime); err != nil {
+	if _, err := imports.Instantiate(ctx, wazeroRuntime); err != nil {
 		log.Fatal(err)
 	}
 
