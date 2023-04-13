@@ -3,3 +3,4 @@
 /build/xpdf-latest.tar.gz
 /build/emsdk
 /build/xpdf
+/.wazero-cache

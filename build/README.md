@@ -1,5 +1,6 @@
-# Get the emsdk repo
-git clone https://github.com/emscripten-core/emsdk.git
+Get the emsdk repo
+
+`git clone https://github.com/emscripten-core/emsdk.git`
 
 # Enter that directory
 cd emsdk
@@ -43,13 +44,20 @@ mkdir -p build
 # Go into the build directory
 cd build
 
+# Install emscripten ports
+embuilder build zlib
+embuilder build libpng
+embuilder build libjpeg
+embuilder build freetype
+
 # Make the cmake target for Emscripten
-cmake .. -DCMAKE_TOOLCHAIN_FILE=$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_CXX_FLAGS="-std=c++14 -g" -DCMAKE_EXE_LINKER_FLAGS="-static -sERROR_ON_UNDEFINED_SYMBOLS=0 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s STANDALONE_WASM=1"
+# Use -g instead of -O2 to get debug symbols.
+emcmake cmake .. -DCMAKE_TOOLCHAIN_FILE=$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_CXX_FLAGS="-std=c++14 -O2" -DCMAKE_EXE_LINKER_FLAGS="-static -sERROR_ON_UNDEFINED_SYMBOLS=0 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s STANDALONE_WASM=1 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBPNG=1 -s USE_LIBJPEG=1"
 
 # Make xpdf
 make
 
 # Copy the built wasm binary to the root of the project
-cp xpdf/*.wasm ../../../
+cp xpdf/*.wasm ../../../wasm
 
 
