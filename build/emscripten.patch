@@ -1,5 +1,5 @@
 diff --git a/system/lib/standalone/standalone.c b/system/lib/standalone/standalone.c
-index 200002dce..5624c926f 100644
+index 200002dce..a947671d7 100644
 --- a/system/lib/standalone/standalone.c
 +++ b/system/lib/standalone/standalone.c
 @@ -6,6 +6,7 @@
@@ -38,7 +38,7 @@ index 200002dce..5624c926f 100644
  void abort() {
    _Exit(1);
  }
-@@ -85,41 +100,867 @@ __attribute__((__weak__)) int _munmap_js(
+@@ -85,41 +100,1015 @@ __attribute__((__weak__)) int _munmap_js(
    return -ENOSYS;
  }
  
@@ -511,21 +511,110 @@ index 200002dce..5624c926f 100644
  }
  
  __attribute__((__weak__)) int __syscall_fcntl64(int fd, int cmd, ...) {
-   return -ENOSYS;
- }
- 
--__attribute__((__weak__)) int __syscall_fstat64(int fd, intptr_t buf) {
++  switch (cmd) {
++    case F_GETFD:
++      // Act as if the close-on-exec flag is always set.
++      return FD_CLOEXEC;
++    case F_SETFD:
++      // The close-on-exec flag is ignored.
++      return 0;
++    case F_GETFL: {
++      // Obtain the flags and the rights of the descriptor.
++      __wasi_fdstat_t fds;
++      __wasi_errno_t error = __wasi_fd_fdstat_get(fd, &fds);
++      if (error != 0) {
++        errno = error;
++        return -1;
++      }
++
++      // Roughly approximate the access mode by converting the rights.
++      int oflags = fds.fs_flags;
++      if ((fds.fs_rights_base &
++           (__WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_READDIR)) != 0) {
++        if ((fds.fs_rights_base & __WASI_RIGHTS_FD_WRITE) != 0)
++          oflags |= O_RDWR;
++        else
++          oflags |= O_RDONLY;
++      } else if ((fds.fs_rights_base & __WASI_RIGHTS_FD_WRITE) != 0) {
++        oflags |= O_WRONLY;
++      } else {
++        oflags |= O_SEARCH;
++      }
++      return oflags;
++    }
++    case F_SETFL: {
++      // Set new file descriptor flags.
++      va_list ap;
++      va_start(ap, cmd);
++      int flags = va_arg(ap, int);
++      va_end(ap);
++
++      __wasi_fdflags_t fs_flags = flags & 0xfff;
++      __wasi_errno_t error =
++        __wasi_fd_fdstat_set_flags(fd, fs_flags);
++      if (error != 0) {
++        errno = error;
++        return -1;
++      }
++      return 0;
++    }
++    default:
++      errno = EINVAL;
++      return -1;
++  }
++}
++
 +__attribute__((__weak__)) int __syscall_ftruncate64(int fd, uint64_t size) {
-+  return -ENOSYS;
++  if (size < 0) {
++    errno = EINVAL;
++    return -1;
++  }
++  __wasi_filesize_t st_size = size;
++  __wasi_errno_t error =
++    __wasi_fd_filestat_set_size(fd, st_size);
++  if (error != 0) {
++    errno = error;
++    return -1;
++  }
++  return 0;
++}
++
++int rmdirat(int dirfd, intptr_t path) {
++  const char* resolved_path = (const char*)path;
++
++  // Resolve path if fd is AT_FDCWD.
++  if (dirfd == AT_FDCWD) {
++    char *relative_path;
++    dirfd = find_relpath(resolved_path, &relative_path);
++
++    // If we can't find a preopen for it, fail as if we can't find the path.
++    if (dirfd == -1) {
++      errno = ENOENT;
++      return -1;
++    }
++
++    resolved_path = relative_path;
++  }
++
++  __wasi_errno_t error = __wasi_path_remove_directory(dirfd, resolved_path, strlen(resolved_path));
++  if (error != 0) {
++    errno = error;
++    return -1;
++  }
++
++  return 0;
 +}
 +
 +__attribute__((__weak__)) int __syscall_rmdir(intptr_t path) {
-   return -ENOSYS;
- }
- 
--// There is no good source of entropy without an import. Make this weak so that
--// it can be replaced with a pRNG or a proper import.
++  return rmdirat(AT_FDCWD, path);
++}
++
 +__attribute__((__weak__)) int __syscall_unlinkat(int dirfd, intptr_t path, int flags) {
++  // unlinkat with AT_REMOVEDIR flag is acutally rmdir.
++  if ((flags & AT_REMOVEDIR) != 0) {
++    return rmdirat(dirfd, path);
++  }
++
 +  const char* resolved_path = (const char*)path;
 +
 +  // Resolve path if fd is AT_FDCWD.
@@ -596,15 +685,74 @@ index 200002dce..5624c926f 100644
 +}
 +
 +__attribute__((__weak__)) int __syscall_dup(int fd) {
-+  return -ENOSYS;
-+}
-+
+   return -ENOSYS;
+ }
+ 
+-__attribute__((__weak__)) int __syscall_fstat64(int fd, intptr_t buf) {
 +__attribute__((__weak__)) int __syscall_dup3(int fd, int suggestfd, int flags) {
-+  return -ENOSYS;
-+}
-+
+   return -ENOSYS;
+ }
+ 
+-// There is no good source of entropy without an import. Make this weak so that
+-// it can be replaced with a pRNG or a proper import.
 +__attribute__((__weak__)) int __syscall_faccessat(int dirfd, intptr_t path, int amode, int flags) {
-+  return -ENOSYS;
++  const char* resolved_path = (const char*)path;
++
++  // Resolve path if fd is AT_FDCWD.
++  if (dirfd == AT_FDCWD) {
++    char *relative_path;
++    dirfd = find_relpath(resolved_path, &relative_path);
++
++    // If we can't find a preopen for it, fail as if we can't find the path.
++    if (dirfd == -1) {
++      errno = ENOENT;
++      return -1;
++    }
++
++    resolved_path = relative_path;
++  }
++
++  // Validate function parameters.
++  if ((amode & ~(F_OK | R_OK | W_OK | X_OK)) != 0 ||
++      (flags & ~AT_EACCESS) != 0) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  // Check for target file existence and obtain the file type.
++  __wasi_lookupflags_t lookup_flags = __WASI_LOOKUPFLAGS_SYMLINK_FOLLOW;
++  __wasi_filestat_t file;
++  __wasi_errno_t error =
++    __wasi_path_filestat_get(dirfd, lookup_flags, resolved_path, strlen(resolved_path), &file);
++  if (error != 0) {
++    errno = error;
++    return -1;
++  }
++
++  // Test whether the requested access rights are present on the
++  // directory file descriptor.
++  if (amode != 0) {
++    __wasi_fdstat_t directory;
++    error = __wasi_fd_fdstat_get(dirfd, &directory);
++    if (error != 0) {
++      errno = error;
++      return -1;
++    }
++
++    __wasi_rights_t min = 0;
++    if ((amode & R_OK) != 0)
++      min |= file.filetype == __WASI_FILETYPE_DIRECTORY
++             ? __WASI_RIGHTS_FD_READDIR
++             : __WASI_RIGHTS_FD_READ;
++    if ((amode & W_OK) != 0)
++      min |= __WASI_RIGHTS_FD_WRITE;
++
++    if ((min & directory.fs_rights_inheriting) != min) {
++      errno = EACCES;
++      return -1;
++    }
++  }
++  return 0;
 +}
 +
 +static void __wasi_filestat_to_stat(const __wasi_filestat_t *in,
@@ -917,7 +1065,7 @@ index 200002dce..5624c926f 100644
  }
  
  // Emscripten additions
-@@ -155,12 +996,24 @@ double emscripten_get_now(void) {
+@@ -155,12 +1144,24 @@ double emscripten_get_now(void) {
    return (1000 * clock()) / (double)CLOCKS_PER_SEC;
  }
  
@@ -943,7 +1091,7 @@ index 200002dce..5624c926f 100644
  //
  // Define these symbols as weak so that when we build with exceptions
  // enabled (using wasm-eh) we get the real versions of these functions
-@@ -168,11 +1021,7 @@ double emscripten_get_now(void) {
+@@ -168,11 +1169,7 @@ double emscripten_get_now(void) {
  
  __attribute__((__weak__))
  void __cxa_throw(void* ptr, void* type, void* destructor) {
@@ -956,7 +1104,7 @@ index 200002dce..5624c926f 100644
    abort();
  }
  
-@@ -228,3 +1077,14 @@ void _emscripten_err(const char* text) { wasi_writeln(2, text); }
+@@ -228,3 +1225,14 @@ void _emscripten_err(const char* text) { wasi_writeln(2, text); }
  void __call_sighandler(sighandler_t handler, int sig) {
    handler(sig);
  }
