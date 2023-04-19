@@ -1,5 +1,5 @@
 diff --git a/system/lib/standalone/standalone.c b/system/lib/standalone/standalone.c
-index 200002dce..bbaf32d7d 100644
+index 200002dce..5624c926f 100644
 --- a/system/lib/standalone/standalone.c
 +++ b/system/lib/standalone/standalone.c
 @@ -6,6 +6,7 @@
@@ -38,7 +38,7 @@ index 200002dce..bbaf32d7d 100644
  void abort() {
    _Exit(1);
  }
-@@ -85,41 +100,809 @@ __attribute__((__weak__)) int _munmap_js(
+@@ -85,41 +100,867 @@ __attribute__((__weak__)) int _munmap_js(
    return -ENOSYS;
  }
  
@@ -520,11 +520,34 @@ index 200002dce..bbaf32d7d 100644
 +}
 +
 +__attribute__((__weak__)) int __syscall_rmdir(intptr_t path) {
-+  return -ENOSYS;
-+}
-+
+   return -ENOSYS;
+ }
+ 
+-// There is no good source of entropy without an import. Make this weak so that
+-// it can be replaced with a pRNG or a proper import.
 +__attribute__((__weak__)) int __syscall_unlinkat(int dirfd, intptr_t path, int flags) {
-+  return -ENOSYS;
++  const char* resolved_path = (const char*)path;
++
++  // Resolve path if fd is AT_FDCWD.
++  if (dirfd == AT_FDCWD) {
++    char *relative_path;
++    dirfd = find_relpath(resolved_path, &relative_path);
++
++    // If we can't find a preopen for it, fail as if we can't find the path.
++    if (dirfd == -1) {
++      errno = ENOENT;
++      return -1;
++    }
++
++    resolved_path = relative_path;
++  }
++
++  __wasi_errno_t error = __wasi_path_unlink_file(dirfd, resolved_path, strlen(resolved_path));
++  if (error != 0) {
++    errno = error;
++    return -1;
++  }
++  return 0;
 +}
 +
 +__attribute__((__weak__)) int __syscall_pipe(intptr_t fd) {
@@ -532,7 +555,44 @@ index 200002dce..bbaf32d7d 100644
 +}
 +
 +__attribute__((__weak__)) int __syscall_renameat(int olddirfd, intptr_t oldpath, int newdirfd, intptr_t newpath) {
-+  return -ENOSYS;
++  const char* oldpathresolved_path = (const char*)oldpath;
++
++  // Resolve path if fd is AT_FDCWD.
++  if (olddirfd == AT_FDCWD) {
++    char *oldpathrelative_path;
++    olddirfd = find_relpath(oldpathresolved_path, &oldpathrelative_path);
++
++    // If we can't find a preopen for it, fail as if we can't find the path.
++    if (olddirfd == -1) {
++      errno = ENOENT;
++      return -1;
++    }
++
++    oldpathresolved_path = oldpathrelative_path;
++  }
++
++  const char* newpathresolved_path = (const char*)newpath;
++
++  // Resolve path if fd is AT_FDCWD.
++  if (newdirfd == AT_FDCWD) {
++    char *newpathrelative_path;
++    newdirfd = find_relpath(newpathresolved_path, &newpathrelative_path);
++
++    // If we can't find a preopen for it, fail as if we can't find the path.
++    if (newdirfd == -1) {
++      errno = ENOENT;
++      return -1;
++    }
++
++    newpathresolved_path = newpathrelative_path;
++  }
++
++  __wasi_errno_t error = __wasi_path_rename(olddirfd, oldpathresolved_path, strlen(oldpathresolved_path), newdirfd, newpathresolved_path, strlen(newpathresolved_path));
++  if (error != 0) {
++    errno = error;
++    return -1;
++  }
++  return 0;
 +}
 +
 +__attribute__((__weak__)) int __syscall_dup(int fd) {
@@ -540,11 +600,9 @@ index 200002dce..bbaf32d7d 100644
 +}
 +
 +__attribute__((__weak__)) int __syscall_dup3(int fd, int suggestfd, int flags) {
-   return -ENOSYS;
- }
- 
--// There is no good source of entropy without an import. Make this weak so that
--// it can be replaced with a pRNG or a proper import.
++  return -ENOSYS;
++}
++
 +__attribute__((__weak__)) int __syscall_faccessat(int dirfd, intptr_t path, int amode, int flags) {
 +  return -ENOSYS;
 +}
@@ -859,7 +917,7 @@ index 200002dce..bbaf32d7d 100644
  }
  
  // Emscripten additions
-@@ -155,12 +938,24 @@ double emscripten_get_now(void) {
+@@ -155,12 +996,24 @@ double emscripten_get_now(void) {
    return (1000 * clock()) / (double)CLOCKS_PER_SEC;
  }
  
@@ -885,7 +943,7 @@ index 200002dce..bbaf32d7d 100644
  //
  // Define these symbols as weak so that when we build with exceptions
  // enabled (using wasm-eh) we get the real versions of these functions
-@@ -168,11 +963,7 @@ double emscripten_get_now(void) {
+@@ -168,11 +1021,7 @@ double emscripten_get_now(void) {
  
  __attribute__((__weak__))
  void __cxa_throw(void* ptr, void* type, void* destructor) {
@@ -898,7 +956,7 @@ index 200002dce..bbaf32d7d 100644
    abort();
  }
  
-@@ -228,3 +1019,14 @@ void _emscripten_err(const char* text) { wasi_writeln(2, text); }
+@@ -228,3 +1077,14 @@ void _emscripten_err(const char* text) { wasi_writeln(2, text); }
  void __call_sighandler(sighandler_t handler, int sig) {
    handler(sig);
  }
