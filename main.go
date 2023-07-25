@@ -6,6 +6,7 @@ import (
 	"embed"
 	_ "embed"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,11 +23,11 @@ import (
 //go:embed wasm/*
 var wasmBinaries embed.FS
 
-//go:embed fonts
+//go:embed fonts/*
 var fontFiles embed.FS
 
 func main() {
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(os.Stdout))
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewHostLoggingListenerFactory(os.Stdout, logging.LogScopeFilesystem))
 	ctx = context.Background() // Comment this line to get debug information.
 
 	runtimeConfig := wazero.NewRuntimeConfig()
@@ -86,7 +87,13 @@ func main() {
 	}
 
 	fsConfig := wazero.NewFSConfig()
-	fsConfig = fsConfig.WithFSMount(fontFiles, "/fonts")
+
+	fontsSub, err := fs.Sub(fontFiles, "fonts")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fsConfig = fsConfig.WithFSMount(fontsSub, "/fonts")
 
 	// On Windows we mount the volume of the current working directory as
 	// root. On Linux we mount / as root.
