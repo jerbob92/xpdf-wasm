@@ -41,6 +41,9 @@ mkdir -p xpdf && tar -xvf xpdf-latest.tar.gz --strip 1 -C xpdf
 # Go into the xpdf directory
 cd xpdf
 
+# Patch xpdf
+patch -p1 < ../xpdf.patch
+
 # Create a build directory
 mkdir -p build
 
