@@ -1,11 +1,11 @@
-diff --git a/xpdf/GlobalParams.cc.old b/xpdf/GlobalParams.cc
-index 5fd4393..37b0e84 100644
---- a/xpdf/GlobalParams.cc.old
+diff --git a/xpdf/GlobalParams.cc b/xpdf/GlobalParams.cc
+index 4c1ff91..d0ca1b7 100644
+--- a/xpdf/GlobalParams.cc
 +++ b/xpdf/GlobalParams.cc
-@@ -109,6 +109,7 @@ static const char *displayFontDirs[] = {
- };
- #else
- static const char *displayFontDirs[] = {
+@@ -107,6 +107,7 @@ static const char *displayFontDirs[] = {
+   "c:/windows/fonts",
+   "c:/winnt/fonts",
+ #else // _WIN32
 +  "/fonts",
    "/usr/share/ghostscript/fonts",
    "/usr/local/share/ghostscript/fonts",

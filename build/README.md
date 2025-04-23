@@ -9,13 +9,13 @@ cd emsdk
 git pull
 
 # Checkout the correct version
-git checkout 3.1.44
+git checkout 4.0.7
 
 # Download and install the SDK tools.
-./emsdk install 3.1.44
+./emsdk install 4.0.7
 
 # Make the SDK version active for the current user. (writes .emscripten file)
-./emsdk activate 3.1.44
+./emsdk activate 4.0.7
 
 # Activate PATH and other environment variables in the current terminal
 source ./emsdk_env.sh
