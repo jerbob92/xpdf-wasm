@@ -10,13 +10,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
-        go: [ "1.20" ]
+        go: [ "1.24" ]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
       - name: Build Linux
@@ -32,11 +32,11 @@ jobs:
         run: |
           $env:CGO_ENABLED = '0'
           go build -o artifacts/xpdf-wasm-windows-x64 main.go
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: builds
+          name: build-${{ matrix.os }}
           path: artifacts
-      - uses: AButler/upload-release-assets@v2.0
+      - uses: AButler/upload-release-assets@v3.0
         with:
           files: 'artifacts/*'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
