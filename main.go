@@ -27,7 +27,7 @@ var wasmBinaries embed.FS
 var fontFiles embed.FS
 
 func main() {
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewHostLoggingListenerFactory(os.Stdout, logging.LogScopeFilesystem))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewHostLoggingListenerFactory(os.Stdout, logging.LogScopeFilesystem))
 	ctx = context.Background() // Comment this line to get debug information.
 
 	runtimeConfig := wazero.NewRuntimeConfig()
